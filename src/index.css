@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Vazirmatn", "Inter", system-ui, sans-serif;
+}
+
+body {
+  font-family: "Vazirmatn", "Inter", system-ui, sans-serif;
+  background-color: #0b0c10;
+  color: #f3f4f6;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom scrollbars for slick mobile app aesthetic */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #11141e;
+}
+::-webkit-scrollbar-thumb {
+  background: #ff9800;
+  border-radius: 2px;
+}

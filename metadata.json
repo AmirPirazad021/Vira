@@ -1,0 +1,6 @@
+{
+  "name": "Vira Quiz",
+  "description": "An interactive Persian trivia game like Quizland (Vira) with a downloaded question bank, offline playability, level selection, phone authentication, and an online leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
