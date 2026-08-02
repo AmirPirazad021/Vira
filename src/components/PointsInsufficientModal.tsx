@@ -5,12 +5,18 @@ import { AlertCircle, Gift } from "lucide-react";
 interface PointsInsufficientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onClaimGift: () => void;
+  currentPoints?: number;
+  requiredPoints?: number;
+  onWatchAd?: () => void;
+  onClaimGift?: () => void;
 }
 
 export default function PointsInsufficientModal({
   isOpen,
   onClose,
+  currentPoints,
+  requiredPoints,
+  onWatchAd,
   onClaimGift
 }: PointsInsufficientModalProps) {
   return (
@@ -41,24 +47,40 @@ export default function PointsInsufficientModal({
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
-              <button
-                id="claim-daily-gift-btn"
-                onClick={() => {
-                  onClaimGift();
-                  onClose();
-                }}
-                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-              >
-                <Gift className="w-5 h-5" />
-                دریافت ۵۰ امتیاز هدیه روزانه
-              </button>
+              {onWatchAd && (
+                <button
+                  id="watch-ad-gift-btn"
+                  onClick={() => {
+                    onWatchAd();
+                    onClose();
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-indigo-950 font-black rounded-xl transition duration-200 shadow-lg flex items-center justify-center gap-2 text-xs"
+                >
+                  <Gift className="w-4 h-4" />
+                  تماشای ویدیو و دریافت سکه رایگان
+                </button>
+              )}
+
+              {onClaimGift && (
+                <button
+                  id="claim-daily-gift-btn"
+                  onClick={() => {
+                    onClaimGift();
+                    onClose();
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs"
+                >
+                  <Gift className="w-4 h-4" />
+                  دریافت ۵0 امتیاز هدیه روزانه
+                </button>
+              )}
 
               <button
                 id="insufficient-ok-btn"
                 onClick={onClose}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium rounded-xl transition duration-200"
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs rounded-xl transition duration-200"
               >
-                باشه، فهمیدم
+                انصراف و متوجه شدم
               </button>
             </div>
           </motion.div>

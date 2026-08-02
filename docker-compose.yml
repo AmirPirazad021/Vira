@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  vira-quiz:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vira_quiz_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SMSIR_API_KEY=${SMSIR_API_KEY}
+      - SMSIR_TEMPLATE_ID=${SMSIR_TEMPLATE_ID:-824072}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - VITE_TAPSELL_APP_KEY=${VITE_TAPSELL_APP_KEY:-af874812-77cc-49ce-8e9c-5f5d9f9d76a3}
+      - VITE_TAPSELL_REWARDED_ZONE_ID=${VITE_TAPSELL_REWARDED_ZONE_ID:-6a6f14638a5b4e20f17fcd35}
+    env_file:
+      - .env
