@@ -45,6 +45,8 @@ import InviteFriendsModal from "./components/InviteFriendsModal";
 import AdminDashboard from "./components/AdminDashboard";
 import AdminLogin from "./components/AdminLogin";
 import ChargeStoreView from "./components/ChargeStoreView";
+import { UserProfileModal } from "./components/UserProfileModal";
+import { DocsModal } from "./components/DocsModal";
 
 import {
   Question,
@@ -151,6 +153,8 @@ export default function App() {
   const [isAnnouncementsModalOpen, setIsAnnouncementsModalOpen] = useState(false);
   const [isRewardedAdModalOpen, setIsRewardedAdModalOpen] = useState(false);
   const [isInviteFriendsOpen, setIsInviteFriendsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDocsModalOpen, setIsDocsModalOpen] = useState(false);
 
   const navigateToAdmin = () => {
     window.history.pushState({}, "", "/admin");
@@ -198,9 +202,22 @@ export default function App() {
 
     const savedUser = localStorage.getItem("vira_quiz_user");
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.phoneNumber) {
+          setUser(parsed);
+          setScreen("DASHBOARD");
+        } else {
+          setUser(null);
+          setScreen("AUTH");
+        }
+      } catch (e) {
+        setUser(null);
+        setScreen("AUTH");
+      }
     } else {
       setUser(null);
+      setScreen("AUTH");
     }
 
     const savedPack = localStorage.getItem("vira_quiz_offline_pack");
@@ -528,13 +545,17 @@ export default function App() {
         {user && screen !== "SPLASH" && screen !== "ADMIN" && (
           <div className="pt-7 px-4 pb-2 bg-indigo-950/90 border-b border-indigo-800/60 flex items-center justify-between text-right z-30" dir="rtl">
             {/* User Level & Name */}
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-yellow-400 to-amber-500 text-indigo-950 font-black text-xs flex items-center justify-center shadow-md">
+            <div
+              onClick={() => setIsProfileModalOpen(true)}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-90 transition bg-indigo-900/40 p-1 rounded-2xl border border-indigo-700/50"
+              title="مشاهده پروفایل و اطلاعات حساب"
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-yellow-400 to-amber-500 text-indigo-950 font-black text-xs flex items-center justify-center shadow-md">
                 سطح {user.level || 1}
               </div>
-              <div className="text-right">
-                <div className="text-xs font-black text-white truncate max-w-[100px]">{user.name}</div>
-                <div className="text-[9px] text-indigo-300">{user.maskedPhone}</div>
+              <div className="text-right pl-1">
+                <div className="text-xs font-black text-white truncate max-w-[90px]">{user.name}</div>
+                <div className="text-[9px] text-indigo-300 font-mono">{user.maskedPhone}</div>
               </div>
             </div>
 
@@ -564,6 +585,16 @@ export default function App() {
                 title="خروج از حساب"
               >
                 <LogOut className="w-3.5 h-3.5 text-red-400" />
+              </button>
+
+              {/* Docs & PRD Modal Button */}
+              <button
+                onClick={() => setIsDocsModalOpen(true)}
+                className="px-2 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-yellow-300 border border-yellow-400/40 text-[10px] font-black rounded-xl transition flex items-center gap-1 shadow-md"
+                title="مشاهده PRD و فایل دیزاین سیستم"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-yellow-400" />
+                <span>مستندات</span>
               </button>
 
               {/* Toggle to Admin Panel */}
@@ -699,25 +730,10 @@ export default function App() {
                 )}
               </div>
 
-              <button
-                onClick={() => {
-                  const demoUser: UserProfile = {
-                    id: "usr_guest",
-                    phoneNumber: "09121111111",
-                    maskedPhone: "0912****111",
-                    name: "کاربر مهمان ویرا",
-                    score: 350,
-                    level: 3,
-                    diamonds: 10,
-                    role: "admin"
-                  };
-                  saveUserToStorage(demoUser);
-                  setScreen("DASHBOARD");
-                }}
-                className="mt-auto py-3 text-indigo-300 text-xs font-bold text-center underline"
-              >
-                ورود سریع به عنوان کاربر مهمان (تست)
-              </button>
+              <div className="mt-auto py-3 bg-indigo-900/40 border border-indigo-800/60 rounded-2xl p-3 text-center text-[11px] text-indigo-300 font-bold flex items-center justify-center gap-1.5">
+                <Lock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                <span>ورود و احراز هویت پیامکی جهت حفظ امنیت حساب و ثبت جوایز اجباری است.</span>
+              </div>
             </motion.div>
           )}
 
@@ -1216,11 +1232,11 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setIsSuggestModalOpen(true)}
+              onClick={() => setIsProfileModalOpen(true)}
               className="flex flex-col items-center gap-0.5 text-indigo-400 hover:text-yellow-400"
             >
-              <Lightbulb className="w-5 h-5" />
-              <span>طراح شو</span>
+              <User className="w-5 h-5" />
+              <span>پروفایل</span>
             </button>
           </div>
         )}
@@ -1229,6 +1245,27 @@ export default function App() {
       {/* MODALS */}
       {user && (
         <>
+          <DocsModal
+            isOpen={isDocsModalOpen}
+            onClose={() => setIsDocsModalOpen(false)}
+          />
+
+          <UserProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            user={user}
+            onUpdateUser={(updated) => saveUserToStorage(updated)}
+            onLogout={() => {
+              saveUserToStorage(null);
+              setIsProfileModalOpen(false);
+              setScreen("AUTH");
+              setIsOtpSent(false);
+              setPhoneInput("");
+              setOtpInput("");
+              triggerNotification("از حساب کاربری خارج شدید.");
+            }}
+          />
+
           <SuggestQuestionModal
             isOpen={isSuggestModalOpen}
             onClose={() => setIsSuggestModalOpen(false)}

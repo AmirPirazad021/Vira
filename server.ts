@@ -271,6 +271,23 @@ app.post("/api/auth/verify-code", (req, res) => {
   }
 });
 
+// Update Profile
+app.post("/api/user/update-profile", (req, res) => {
+  const { userId, name } = req.body;
+  if (!userId || !name) {
+    return res.status(400).json({ error: "شناسه کاربر و نام جدید الزامی است." });
+  }
+
+  const user = registeredUsers.find(u => u.id === userId || u.phoneNumber === userId);
+  if (user) {
+    user.name = name.trim();
+    addAuditLog("ویرایش پروفایل", user.name, `نام کاربر به "${user.name}" تغییر یافت.`, req);
+    return res.json({ success: true, user });
+  } else {
+    return res.status(404).json({ error: "کاربر یافت نشد." });
+  }
+});
+
 // Leaderboard
 app.get("/api/leaderboard", (req, res) => {
   res.json(leaderboard);

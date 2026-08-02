@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { PlayCircle, Award, ShieldAlert, CheckCircle2, Clock, X, Lock, Sparkles, Volume2, VolumeX, Play, Pause, Film } from "lucide-react";
+import { PlayCircle, Award, ShieldAlert, CheckCircle2, Clock, X, Lock, Sparkles, Volume2, VolumeX, Play, Pause, Film, Loader2, Tv, AlertTriangle } from "lucide-react";
 import { UserProfile } from "../types";
 import { requestTapsellRewardedAd, showTapsellRewardedAd, TAPSELL_CONFIG } from "../services/tapsell";
 
@@ -11,18 +11,28 @@ interface RewardedAdModalProps {
   onRewardEarned: (newScore: number) => void;
 }
 
+// Ultra-reliable public MP4 fallback video URLs with CORS enabled
 const PROMO_VIDEOS = [
   {
-    title: "تبلیغ ویژه بازی و ویدیوی اسپانسری تپسل",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    title: "تیزر اسپانسری ویدیویی ویرا و تپسل",
+    urls: [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+      "https://media.w3.org/2010/05/sintel/trailer.mp4"
+    ]
   },
   {
-    title: "تیزر تبلیغاتی برنامه و سرویس‌های برتر ویرا",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+    title: "ویدیوی جایزه‌دار شبکه تبلیغات تپسل",
+    urls: [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+      "https://www.w3schools.com/html/mov_bbb.mp4"
+    ]
   },
   {
-    title: "ویدیو انیمیشن چالش‌ها و جوایز آنلاین",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
+    title: "چالش‌ها و جوایز آنلاین ویرا کویز",
+    urls: [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+      "https://media.w3.org/2010/05/sintel/trailer.mp4"
+    ]
   }
 ];
 
@@ -44,6 +54,9 @@ export default function RewardedAdModal({
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentVideo, setCurrentVideo] = useState(PROMO_VIDEOS[0]);
+  const [videoSourceIndex, setVideoSourceIndex] = useState(0);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [hasVideoFailed, setHasVideoFailed] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +64,8 @@ export default function RewardedAdModal({
       setCountdown(10);
       setErrorMsg("");
       setIsMuted(true);
+      setHasVideoFailed(false);
+      setIsVideoLoading(true);
       checkAdLimits();
     }
   }, [isOpen]);
@@ -84,6 +99,13 @@ export default function RewardedAdModal({
     return () => clearInterval(timer);
   }, [adState, countdown, isPlaying]);
 
+  // Ensure HTML5 video muted state is synchronously updated on the DOM element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
   const startAdPlayback = async () => {
     if (remainingAdsToday <= 0) {
       setErrorMsg("سقف روزانه تماشای تبلیغ (۵ عدد در روز) پر شده است.");
@@ -100,6 +122,9 @@ export default function RewardedAdModal({
     // Pick a random promotional video
     const randomVideo = PROMO_VIDEOS[Math.floor(Math.random() * PROMO_VIDEOS.length)];
     setCurrentVideo(randomVideo);
+    setVideoSourceIndex(0);
+    setHasVideoFailed(false);
+    setIsVideoLoading(true);
 
     const res = await requestTapsellRewardedAd(TAPSELL_CONFIG.rewardedZoneId, {
       onError: (err) => setErrorMsg(err),
@@ -111,18 +136,44 @@ export default function RewardedAdModal({
       setAdState("playing");
       setCountdown(10);
       setIsPlaying(true);
+      
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.currentTime = 0;
-          videoRef.current.play().catch(() => {});
+          videoRef.current.muted = isMuted;
+          videoRef.current.play().catch((err) => {
+            console.warn("Autoplay was prevented or video failed to play:", err);
+            // If play is blocked or fails, try next source or trigger fallback player
+            handleVideoError();
+          });
         }
-      }, 100);
+      }, 150);
     } else {
       setAdState("idle");
     }
   };
 
+  const handleVideoError = () => {
+    if (videoSourceIndex + 1 < currentVideo.urls.length) {
+      console.log("Primary video URL failed, trying secondary fallback source...");
+      setVideoSourceIndex((prev) => prev + 1);
+      setIsVideoLoading(true);
+      if (videoRef.current) {
+        videoRef.current.load();
+        videoRef.current.play().catch(() => {});
+      }
+    } else {
+      console.warn("All remote video URLs failed to load. Displaying Tapsell Animated Interactive Video Ad Canvas fallback.");
+      setHasVideoFailed(true);
+      setIsVideoLoading(false);
+    }
+  };
+
   const togglePlayPause = () => {
+    if (hasVideoFailed) {
+      setIsPlaying(!isPlaying);
+      return;
+    }
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
@@ -139,7 +190,9 @@ export default function RewardedAdModal({
 
   const verifyAdRewardOnServer = async () => {
     if (videoRef.current) {
-      videoRef.current.pause();
+      try {
+        videoRef.current.pause();
+      } catch (e) {}
     }
     setAdState("verifying");
     try {
@@ -177,14 +230,14 @@ export default function RewardedAdModal({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="w-full max-w-sm bg-gradient-to-b from-indigo-900 via-indigo-950 to-slate-950 border border-indigo-700/60 rounded-3xl p-6 shadow-2xl text-center relative overflow-hidden"
+            className="w-full max-w-sm bg-gradient-to-b from-indigo-900 via-indigo-950 to-slate-950 border border-indigo-700/60 rounded-3xl p-5 shadow-2xl text-center relative overflow-hidden"
             dir="rtl"
           >
             {/* Close button only available if NOT playing */}
             {adState !== "playing" && (
               <button
                 onClick={onClose}
-                className="absolute top-4 left-4 p-1.5 rounded-full bg-indigo-800/60 text-indigo-300 hover:text-white"
+                className="absolute top-4 left-4 p-1.5 rounded-full bg-indigo-800/60 text-indigo-300 hover:text-white transition z-10"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -197,9 +250,9 @@ export default function RewardedAdModal({
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-black text-white mb-1">دیدن فیلم تپسل و دریافت ۱ امتیاز</h3>
+                  <h3 className="text-base font-black text-white mb-1">دیدن فیلم تپسل و دریافت ۱ امتیاز</h3>
                   <p className="text-xs text-indigo-200">
-                    با تماشای یک ویدیوی ۱۰ ثانیه‌ای تپسل، <span className="text-yellow-400 font-bold">۱ امتیاز رایگان</span> دریافت کن!
+                    با تماشای کامل ویدیوی ۱۰ ثانیه‌ای تپسل، <span className="text-yellow-400 font-bold">۱ امتیاز رایگان</span> دریافت کن!
                   </p>
                 </div>
 
@@ -229,7 +282,7 @@ export default function RewardedAdModal({
                 <button
                   disabled={remainingAdsToday <= 0 || cooldownTimeLeft > 0}
                   onClick={startAdPlayback}
-                  className={`w-full py-4 text-xs font-black rounded-2xl transition shadow-xl flex items-center justify-center gap-2 ${
+                  className={`w-full py-3.5 text-xs font-black rounded-2xl transition shadow-xl flex items-center justify-center gap-2 ${
                     remainingAdsToday <= 0 || cooldownTimeLeft > 0
                       ? "bg-slate-800 text-slate-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-indigo-950 shadow-yellow-500/20"
@@ -254,70 +307,122 @@ export default function RewardedAdModal({
                 </button>
               </div>
             ) : adState === "playing" ? (
-              <div className="space-y-3 py-2 text-right">
+              <div className="space-y-3 py-1 text-right">
                 <div className="flex items-center justify-between text-xs text-yellow-400 font-bold bg-indigo-900/60 border border-indigo-700/60 px-3 py-1.5 rounded-2xl">
-                  <span className="flex items-center gap-1">
-                    <Film className="w-3.5 h-3.5 text-yellow-400" />
-                    <span>{currentVideo.title}</span>
+                  <span className="flex items-center gap-1 truncate max-w-[190px]">
+                    <Film className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                    <span className="truncate">{currentVideo.title}</span>
                   </span>
-                  <span className="bg-yellow-400 text-indigo-950 px-2 py-0.5 rounded-lg text-[10px] font-black">
-                    Tapsell Video Ad
+                  <span className="bg-yellow-400 text-indigo-950 px-2 py-0.5 rounded-lg text-[10px] font-black flex-shrink-0">
+                    Tapsell Ad
                   </span>
                 </div>
 
-                {/* Real HTML5 Video Player Container */}
-                <div className="relative w-full h-52 bg-black rounded-2xl border-2 border-indigo-600 overflow-hidden shadow-2xl flex items-center justify-center">
-                  <video
-                    ref={videoRef}
-                    src={currentVideo.url}
-                    autoPlay
-                    playsInline
-                    muted={isMuted}
-                    onEnded={() => verifyAdRewardOnServer()}
-                    className="w-full h-full object-cover"
-                  />
+                {/* Video Container */}
+                <div className="relative w-full h-56 bg-slate-950 rounded-2xl border-2 border-indigo-600 overflow-hidden shadow-2xl flex items-center justify-center">
+                  {!hasVideoFailed ? (
+                    <>
+                      <video
+                        ref={videoRef}
+                        src={currentVideo.urls[videoSourceIndex]}
+                        autoPlay
+                        playsInline
+                        muted={isMuted}
+                        onLoadStart={() => setIsVideoLoading(true)}
+                        onCanPlay={() => setIsVideoLoading(false)}
+                        onWaiting={() => setIsVideoLoading(true)}
+                        onPlaying={() => setIsVideoLoading(false)}
+                        onError={handleVideoError}
+                        onEnded={() => verifyAdRewardOnServer()}
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Loading Spinner overlay when video is buffering */}
+                      {isVideoLoading && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-yellow-400 z-10">
+                          <Loader2 className="w-8 h-8 animate-spin" />
+                          <span className="text-[11px] font-bold text-white">در حال آماده‌سازی واریز ویدیو تپسل...</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Interactive Tapsell Video Ad Canvas Fallback (used if external MP4 CDN is blocked) */
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-950 to-slate-950 p-4 flex flex-col items-center justify-between relative overflow-hidden text-center">
+                      {/* Animated Background Particles */}
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl animate-pulse" />
+                      <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-cyan-400/20 rounded-full blur-2xl animate-pulse" />
+
+                      <div className="flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/30 px-3 py-1 rounded-xl text-[11px] text-yellow-300 font-bold mt-2">
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
+                        <span>ویدیوی اسپانسری هوشمند تپسل (Tapsell Ad)</span>
+                      </div>
+
+                      <div className="space-y-2 my-auto z-10">
+                        <div className="w-16 h-16 mx-auto bg-gradient-to-tr from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center text-indigo-950 font-black shadow-xl animate-bounce">
+                          <Tv className="w-8 h-8" />
+                        </div>
+                        <h4 className="text-sm font-black text-white">سامانه هوشمند ویرا و تپسل</h4>
+                        <p className="text-[11px] text-indigo-200 leading-snug px-2">
+                          در حال محاسبه و ثبت هوشمند ۱ امتیاز رایگان برای حساب کاربری شما...
+                        </p>
+                      </div>
+
+                      {/* Animated Equalizer Sound Bars */}
+                      <div className="flex items-end justify-center gap-1.5 h-6 mb-2">
+                        <span className="w-1.5 bg-yellow-400 rounded-full animate-bounce h-full" />
+                        <span className="w-1.5 bg-cyan-400 rounded-full animate-bounce h-3/4 delay-100" />
+                        <span className="w-1.5 bg-emerald-400 rounded-full animate-bounce h-1/2 delay-200" />
+                        <span className="w-1.5 bg-purple-400 rounded-full animate-bounce h-full delay-300" />
+                        <span className="w-1.5 bg-yellow-400 rounded-full animate-bounce h-2/3 delay-150" />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Top Overlay: Countdown & Mute button */}
-                  <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-auto">
-                    <div className="bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[11px] text-amber-300 font-mono font-black flex items-center gap-1.5 border border-amber-400/30">
+                  <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-auto z-20">
+                    <div className="bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-[11px] text-amber-300 font-mono font-black flex items-center gap-1.5 border border-amber-400/30 shadow-lg">
                       <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                      <span>{countdown} ثانیه تا واریز ۱ امتیاز</span>
+                      <span>{countdown} ثانیه تا دریافت ۱ امتیاز</span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={toggleMute}
-                      className="p-2 bg-black/80 hover:bg-black backdrop-blur-md rounded-xl text-yellow-400 border border-yellow-400/30 transition"
-                      title={isMuted ? "وصل صدا" : "قطع صدا"}
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
+                    {!hasVideoFailed && (
+                      <button
+                        type="button"
+                        onClick={toggleMute}
+                        className="p-2 bg-black/80 hover:bg-black backdrop-blur-md rounded-xl text-yellow-400 border border-yellow-400/30 transition shadow-lg"
+                        title={isMuted ? "وصل صدا" : "قطع صدا"}
+                      >
+                        {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                      </button>
+                    )}
                   </div>
 
                   {/* Center Overlay: Play/Pause toggle overlay */}
-                  <button
-                    type="button"
-                    onClick={togglePlayPause}
-                    className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition group"
-                  >
-                    {!isPlaying && (
-                      <div className="w-14 h-14 rounded-full bg-yellow-400 text-indigo-950 flex items-center justify-center shadow-2xl scale-100 group-hover:scale-110 transition">
-                        <Play className="w-7 h-7 ml-1 fill-current" />
-                      </div>
-                    )}
-                  </button>
+                  {!hasVideoFailed && !isVideoLoading && (
+                    <button
+                      type="button"
+                      onClick={togglePlayPause}
+                      className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/20 transition group z-10"
+                    >
+                      {!isPlaying && (
+                        <div className="w-14 h-14 rounded-full bg-yellow-400 text-indigo-950 flex items-center justify-center shadow-2xl scale-100 group-hover:scale-110 transition">
+                          <Play className="w-7 h-7 ml-1 fill-current" />
+                        </div>
+                      )}
+                    </button>
+                  )}
 
                   {/* Bottom Overlay: Progress bar */}
-                  <div className="absolute bottom-0 inset-x-0 h-2 bg-slate-900/80">
+                  <div className="absolute bottom-0 inset-x-0 h-2 bg-slate-900/80 z-20">
                     <div
-                      className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-1000 ease-linear"
+                      className="h-full bg-gradient-to-r from-yellow-400 via-amber-400 to-cyan-400 transition-all duration-1000 ease-linear"
                       style={{ width: `${((10 - countdown) / 10) * 100}%` }}
                     />
                   </div>
                 </div>
 
                 <p className="text-[11px] text-indigo-300 text-center font-bold">
-                  تماشای کامل فیلم تا پایان تایمر برای ثبت امتیاز در کیف پول الزامی است.
+                  تماشای کامل تا پایان تایمر معکوس برای ثبت امتیاز در حساب کاربری الزامی است.
                 </p>
               </div>
             ) : adState === "verifying" ? (
